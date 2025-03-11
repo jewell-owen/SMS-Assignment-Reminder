@@ -17,6 +17,9 @@ const logger = require("firebase-functions/logger");
 //   logger.info("Hello logs!", {structuredData: true});
 //   response.send("Hello from Firebase!");
 // });
+
+// My code
+//-----------------------------------------------------------------------------------------------------
 const functions = require("firebase-functions");
 const axios = require("axios");
 const twilio = require("twilio");
@@ -45,31 +48,31 @@ async function getAssignments(courseId) {
 }
 
 // Send SMS notification
-// async function sendSms(message) {
-//   try {
-//     await client.messages.create({
-//       body: message,
-//       from: TWILIO_PHONE,
-//       to: USER_PHONE
-//     });
-//   } catch (error) {
-//     console.error("Error sending SMS:", error);
-//   }
-// }
+async function sendSms(message) {
+  try {
+    await client.messages.create({
+      body: message,
+      from: TWILIO_PHONE,
+      to: USER_PHONE
+    });
+  } catch (error) {
+    console.error("Error sending SMS:", error);
+  }
+}
 
 // Scheduled function to run twice a day
-// exports.assignmentReminder = functions.pubsub.schedule("0 8,20 * * *") // 8 AM and 8 PM UTC
-//   .timeZone("America/Chicago")
-//   .onRun(async () => {
-//     const courseId = "<your-course-id>"; // Replace with actual course ID
-//     const assignments = await getAssignments(courseId);
+exports.assignmentReminder = functions.pubsub.schedule("0 8,20 * * *") // 8 AM and 8 PM UTC
+  .timeZone("America/Chicago")
+  .onRun(async () => {
+    const courseId = "<your-course-id>"; // Replace with actual course ID
+    const assignments = await getAssignments(courseId);
     
-//     const upcoming = assignments
-//       .filter(a => new Date(a.due_at) > new Date())
-//       .map(a => `${a.name}: Due ${new Date(a.due_at).toLocaleString()}`)
-//       .join("\n");
+    const upcoming = assignments
+      .filter(a => new Date(a.due_at) > new Date())
+      .map(a => `${a.name}: Due ${new Date(a.due_at).toLocaleString()}`)
+      .join("\n");
 
-//     if (upcoming) {
-//       await sendSms(`Upcoming Assignments:\n${upcoming}`);
-//     }
-//   });
+    if (upcoming) {
+      await sendSms(`Upcoming Assignments:\n${upcoming}`);
+    }
+  });
