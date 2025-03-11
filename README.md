@@ -1,2 +1,2 @@
 # SMS-Assignment-Reminder
-I sometimes forget to check Canvas for my assignments but I always check my texts. This program uses the Canvas API to send an SMS (Twilio API) morning and evening reminder of upcoming assignment deadlines.
+I sometimes forget to check Canvas for my assignments, but I always check my texts. This program uses the Canvas API to retrieve my upcoming assignment deadlines. It then sends an SMS message using the Twilio API in the morning and evening to remind me of upcoming assignment deadlines. Firebase functions used to host/deploy. Program built with Node.js and written in JavaScript.
