@@ -1,3 +1,4 @@
 .env
+courseIds.txt
 node_modules/
 *.local
