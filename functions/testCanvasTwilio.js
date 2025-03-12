@@ -1,36 +1,43 @@
-// File to Test Canvas API and Twilio API together
-//----------------------------------------------------------------------------------
-
-//Test to fetch all assignments for one course (requires course ID)
 require("dotenv").config();
 const axios = require("axios");
+const twilio = require("twilio");
 
-const CANVAS_API_URL =
-  "https://canvas.iastate.edu/api/v1/users/self/todo?per_page=50";
+// Canvas Setup
+const CANVAS_API_URL = "https://canvas.iastate.edu/api/v1/users/self/todo";
 const CANVAS_API_TOKEN = process.env.CANVAS_API_TOKEN;
 
-// Fetch assignments from Canvas (excluding submitted ones and including ungraded quizzes)
-async function getTodo() {
+// Twilio Setup
+const client = twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
+const TWILIO_PHONE = process.env.TWILIO_PHONE;
+const USER_PHONE = process.env.USER_PHONE;
+
+// Mapping of Course IDs to Names
+const COURSE_MAP = {
+  115083: "CPRE 489",
+  118021: "CPRE 310",
+  117614: "CPRE 308",
+  117667: "AI 201",
+  115076: "AI 202",
+};
+
+// Function to fetch all pages of the to-do list
+async function getAllTodoItems(url, collectedItems = []) {
   try {
-    const response = await axios.get(CANVAS_API_URL, {
-      headers: {
-        Authorization: `Bearer ${CANVAS_API_TOKEN}`,
-      },
-      params: {
-        include: ["ungraded_quizzes"], // Include ungraded quizzes
-      },
+    const response = await axios.get(url, {
+      headers: { Authorization: `Bearer ${CANVAS_API_TOKEN}` },
+      params: { include: ["ungraded_quizzes"], per_page: 50 },
     });
 
-    const todoItems = response.data;
+    const newItems = response.data;
+    collectedItems = collectedItems.concat(newItems);
 
-    // Filter out assignments that have already been submitted
-    const pendingAssignments = todoItems.filter(
-      (item) => !item.has_submitted_submissions // Exclude ignored or completed items !item.ignore &&
-    );
+    // Check for pagination (Canvas API includes next page link in headers)
+    const nextPageUrl = getNextPageUrl(response.headers.link);
+    if (nextPageUrl) {
+      return getAllTodoItems(nextPageUrl, collectedItems); // Recursive call to get next page
+    }
 
-    console.log("Filtered Assignments (Not Submitted):", pendingAssignments);
-
-    return pendingAssignments;
+    return collectedItems;
   } catch (error) {
     console.error(
       "Error fetching todo:",
@@ -40,5 +47,58 @@ async function getTodo() {
   }
 }
 
+// Function to extract next page URL from Canvas API response headers
+function getNextPageUrl(linkHeader) {
+  if (!linkHeader) return null;
+  const links = linkHeader.split(",").map((link) => link.trim());
+  for (const link of links) {
+    if (link.includes('rel="next"')) {
+      return link.match(/<(.*)>/)[1]; // Extract the URL inside <>
+    }
+  }
+  return null;
+}
+
+// Format assignments into an SMS message
+function formatAssignmentsMessage(assignments) {
+  if (assignments.length === 0) {
+    return "Hello Owen, you have no upcoming assignments. Keep up the good work! 🎉";
+  }
+
+  let message = `Hello Owen, there are ${assignments.length} assignments due soon.\n\n`;
+
+  assignments.forEach((assignment) => {
+    const courseName = COURSE_MAP[assignment.course_id] || "Unknown Course";
+    const dueDate = assignment.due_at
+      ? new Date(assignment.due_at).toLocaleString()
+      : "No Due Date";
+
+    message += `📌 ${assignment.name} - ${dueDate} - ${courseName}\n`;
+  });
+
+  message += "\nGood Luck and Don't Procrastinate! 🚀";
+
+  return message;
+}
+
+// Send SMS notification
+async function sendSms(message) {
+  try {
+    await client.messages.create({
+      body: message,
+      from: TWILIO_PHONE,
+      to: USER_PHONE,
+    });
+    console.log("✅ SMS sent successfully!");
+  } catch (error) {
+    console.error("Error sending SMS:", error);
+  }
+}
+
 // Run the test
-getTodo();
+getAllTodoItems(CANVAS_API_URL).then((todoItems) => {
+  console.log(`📌 Retrieved ${todoItems.length} assignments:`, todoItems);
+  const message = formatAssignmentsMessage(todoItems);
+  console.log("📨 Sending SMS with message:\n", message);
+  sendSms(message);
+});
