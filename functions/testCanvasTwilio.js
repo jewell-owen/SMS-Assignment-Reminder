@@ -39,10 +39,10 @@ async function getAllTodoItems(url, collectedItems = []) {
 
     return collectedItems;
   } catch (error) {
-    console.error(
-      "Error fetching todo:",
-      error.response ? error.response.data : error.message
-    );
+    //console.error(
+    //  "Error fetching todo:",
+    //  error.response ? error.response.data : error.message
+    //);
     return [];
   }
 }
@@ -67,13 +67,16 @@ function formatAssignmentsMessage(assignments) {
 
   let message = `Hello Owen, there are ${assignments.length} assignments due soon.\n\n`;
 
-  assignments.forEach((assignment) => {
-    const courseName = COURSE_MAP[assignment.course_id] || "Unknown Course";
-    const dueDate = assignment.due_at
-      ? new Date(assignment.due_at).toLocaleString()
+  assignments.forEach((item) => {
+    if (!item.assignment) return; // Skip if the assignment object is missing
+
+    const courseName = COURSE_MAP[item.course_id] || "Unknown Course";
+    const assignmentName = item.assignment.name || "Unnamed Assignment";
+    const dueDate = item.assignment.due_at
+      ? new Date(item.assignment.due_at).toLocaleString()
       : "No Due Date";
 
-    message += `📌 ${assignment.name} - ${dueDate} - ${courseName}\n`;
+    message += `📌 ${assignmentName} - ${dueDate} - ${courseName}\n`;
   });
 
   message += "\nGood Luck and Don't Procrastinate! 🚀";
@@ -89,16 +92,30 @@ async function sendSms(message) {
       from: TWILIO_PHONE,
       to: USER_PHONE,
     });
-    console.log("✅ SMS sent successfully!");
+    //console.log("✅ SMS sent successfully!");
   } catch (error) {
-    console.error("Error sending SMS:", error);
+    //console.error("Error sending SMS:", error);
   }
 }
 
 // Run the test
 getAllTodoItems(CANVAS_API_URL).then((todoItems) => {
-  console.log(`📌 Retrieved ${todoItems.length} assignments:`, todoItems);
-  const message = formatAssignmentsMessage(todoItems);
-  console.log("📨 Sending SMS with message:\n", message);
+  // Filter out assignments without a due date
+  const assignmentsWithDueDates = todoItems.filter(
+    (item) => item.assignment?.due_at
+  );
+
+  // Sort assignments by due date (earliest first)
+  assignmentsWithDueDates.sort(
+    (a, b) => new Date(a.assignment.due_at) - new Date(b.assignment.due_at)
+  );
+
+  //console.log(
+  //  `📌 Retrieved ${assignmentsWithDueDates.length} assignments:`,
+  //  assignmentsWithDueDates
+  //);
+
+  const message = formatAssignmentsMessage(assignmentsWithDueDates);
+  //console.log("📨 Sending SMS with message:\n", message);
   sendSms(message);
 });

@@ -1,55 +1,106 @@
-// File to Test Canvas API
-//----------------------------------------------------------------------------------
-
-//Test to fetch all Canvas Courses
-// require("dotenv").config();
-// const axios = require("axios");
-
-// const CANVAS_API_URL = "https://canvas.iastate.edu/api/v1/courses?per_page=50";
-// const CANVAS_API_TOKEN = process.env.CANVAS_API_TOKEN;
-
-// async function getCourses() {
-//   try {
-//     const response = await axios.get(CANVAS_API_URL, {
-//       headers: { Authorization: `Bearer ${CANVAS_API_TOKEN}` }
-//     });
-
-//     console.log("Your Courses:", response.data);
-//   } catch (error) {
-//     console.error("Error fetching courses:", error.response ? error.response.data : error.message);
-//   }
-// }
-
-// getCourses();
-
-//Test to fetch all assignments for one course (requires course ID)
 require("dotenv").config();
 const axios = require("axios");
+const twilio = require("twilio");
 
-const CANVAS_API_URL = "https://canvas.iastate.edu/api/v1/courses";
+// Canvas Setup
+const CANVAS_API_URL = "https://canvas.iastate.edu/api/v1/users/self/todo";
 const CANVAS_API_TOKEN = process.env.CANVAS_API_TOKEN;
-const COURSE_ID = "117614"; // Replace with your actual course ID
 
-// Fetch assignments from Canvas
-async function getAssignments(courseId) {
+// Twilio Setup
+const client = twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
+const TWILIO_PHONE = process.env.TWILIO_PHONE;
+const USER_PHONE = process.env.USER_PHONE;
+
+// Mapping of Course IDs to Names
+const COURSE_MAP = {
+  115083: "CPRE 489",
+  118021: "CPRE 310",
+  117614: "CPRE 308",
+  117667: "AI 201",
+  115076: "AI 202",
+};
+
+// Function to fetch all pages of the to-do list
+async function getAllTodoItems(url, collectedItems = []) {
   try {
-    const response = await axios.get(
-      `${CANVAS_API_URL}/${courseId}/assignments`,
-      {
-        headers: { Authorization: `Bearer ${CANVAS_API_TOKEN}` },
-      }
-    );
+    const response = await axios.get(url, {
+      headers: { Authorization: `Bearer ${CANVAS_API_TOKEN}` },
+      params: { include: ["ungraded_quizzes"], per_page: 50 },
+    });
 
-    console.log("Raw Canvas API Response:", response.data); // Pretty print the JSON JSON.stringify(response.data, null, 2)
-    return response.data;
+    const newItems = response.data;
+    collectedItems = collectedItems.concat(newItems);
+
+    // Check for pagination (Canvas API includes next page link in headers)
+    const nextPageUrl = getNextPageUrl(response.headers.link);
+    if (nextPageUrl) {
+      return getAllTodoItems(nextPageUrl, collectedItems); // Recursive call to get next page
+    }
+
+    return collectedItems;
   } catch (error) {
     console.error(
-      "Error fetching assignments:",
+      "Error fetching todo:",
       error.response ? error.response.data : error.message
     );
     return [];
   }
 }
 
+// Function to extract next page URL from Canvas API response headers
+function getNextPageUrl(linkHeader) {
+  if (!linkHeader) return null;
+  const links = linkHeader.split(",").map((link) => link.trim());
+  for (const link of links) {
+    if (link.includes('rel="next"')) {
+      return link.match(/<(.*)>/)[1]; // Extract the URL inside <>
+    }
+  }
+  return null;
+}
+
+// Format assignments into an SMS message
+function formatAssignmentsMessage(assignments) {
+  if (assignments.length === 0) {
+    return "Hello Owen, you have no upcoming assignments. Keep up the good work! 🎉";
+  }
+
+  let message = `Hello Owen, there are ${assignments.length} assignments due soon.\n\n`;
+
+  assignments.forEach((item) => {
+    if (!item.assignment) return; // Skip if the assignment object is missing
+
+    const courseName = COURSE_MAP[item.course_id] || "Unknown Course";
+    const assignmentName = item.assignment.name || "Unnamed Assignment";
+    const dueDate = item.assignment.due_at
+      ? new Date(item.assignment.due_at).toLocaleString()
+      : "No Due Date";
+
+    message += `📌 ${assignmentName} - ${dueDate} - ${courseName}\n`;
+  });
+
+  message += "\nGood Luck and Don't Procrastinate! 🚀";
+
+  return message;
+}
+
 // Run the test
-getAssignments(COURSE_ID);
+getAllTodoItems(CANVAS_API_URL).then((todoItems) => {
+  // Filter out assignments without a due date
+  const assignmentsWithDueDates = todoItems.filter(
+    (item) => item.assignment?.due_at
+  );
+
+  // Sort assignments by due date (earliest first)
+  assignmentsWithDueDates.sort(
+    (a, b) => new Date(a.assignment.due_at) - new Date(b.assignment.due_at)
+  );
+
+  console.log(
+    `📌 Retrieved ${assignmentsWithDueDates.length} assignments:`,
+    assignmentsWithDueDates
+  );
+
+  const message = formatAssignmentsMessage(assignmentsWithDueDates);
+  console.log("📨 Sending SMS with message:\n", message);
+});
