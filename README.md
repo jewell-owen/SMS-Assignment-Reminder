@@ -4,7 +4,7 @@ I sometimes forget to check Canvas for my assignments, but I always check my tex
 
 Canvas API:
 
-url:GET|/api/v1/courses - Returns a list of my courses which I used to map course id's to course names
+url:GET|/api/v1/courses - Returns a list of my courses that map course id's to course names
 url:GET|/api/v1/users/self/todo - Returns a list of my todo items which I sort by date
 
 Twilio API:
@@ -18,13 +18,14 @@ to: USER_PHONE,
 });
 
 Firebase Functions:
+
 Ignore eslint errors with: npx eslint . --fix
 Deploy with: firebase deploy --only functions
-![alt text](image.png)
+![alt text](firebase.png)
 
 Google Cloud:
 
 Enabled API's in Google Cloud Console: Cloud Scheduler, Cloud Functions, Cloud Storage, Cloud Build, Cloud Run, PubSub, Firebase Extensions, Artifact Registry.
 
 Example Output:
-
+![alt text](output.jpg)
