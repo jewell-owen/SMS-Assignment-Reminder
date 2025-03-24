@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "sms-assignment-reminder"
-  }
+    "default": "sms-assignment-reminder",
+    "sms-assignment-reminder": "sms-assignment-reminder"
+  },
+  "targets": {},
+  "etags": {}
 }
