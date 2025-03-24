@@ -20,7 +20,12 @@ const COURSE_MAP = {
   115076: "AI 202",
 };
 
-// Function to fetch all pages of the to-do list
+/**
+ * Fetches all To-Do items from Canvas API.
+ * @param {string} url - The API endpoint URL.
+ * @param {Array} collectedItems - Accumulated items (for pagination).
+ * @return {Promise<Array>} - List of To-Do items.
+ */
 async function getAllTodoItems(url, collectedItems = []) {
   try {
     const response = await axios.get(url, {
@@ -31,44 +36,54 @@ async function getAllTodoItems(url, collectedItems = []) {
     const newItems = response.data;
     collectedItems = collectedItems.concat(newItems);
 
-    // Check for pagination (Canvas API includes next page link in headers)
     const nextPageUrl = getNextPageUrl(response.headers.link);
     if (nextPageUrl) {
-      return getAllTodoItems(nextPageUrl, collectedItems); // Recursive call to get next page
+      return getAllTodoItems(nextPageUrl, collectedItems);
     }
 
     return collectedItems;
   } catch (error) {
-    //console.error(
-    //  "Error fetching todo:",
-    //  error.response ? error.response.data : error.message
-    //);
+    console.error(
+      "Error fetching todo:",
+      error.response ? error.response.data : error.message
+    );
     return [];
   }
 }
 
-// Function to extract next page URL from Canvas API response headers
+/**
+ * Extracts the next page URL from the Canvas API response header.
+ * @param {string} linkHeader - The `Link` header from the API response.
+ * @return {string|null} - Next page URL or null if none.
+ */
 function getNextPageUrl(linkHeader) {
   if (!linkHeader) return null;
   const links = linkHeader.split(",").map((link) => link.trim());
   for (const link of links) {
     if (link.includes('rel="next"')) {
-      return link.match(/<(.*)>/)[1]; // Extract the URL inside <>
+      return link.match(/<(.*)>/)[1];
     }
   }
   return null;
 }
 
-// Format assignments into an SMS message
+/**
+ * Formats the assignments into a user-friendly SMS message.
+ * @param {Array} assignments - List of assignments with due dates.
+ * @return {string} - Formatted SMS message.
+ */
 function formatAssignmentsMessage(assignments) {
   if (assignments.length === 0) {
-    return "Hello Owen, you have no upcoming assignments. Keep up the good work! 🎉";
+    return `Hello Owen, you have no upcoming assignments. 
+            Keep up the good work! 🎉`;
   }
 
-  let message = `Hello Owen, there are ${assignments.length} assignments due soon.\n\n`;
+  let message =
+    `Hello Owen, there are ${assignments.length} ` +
+    `assignments due soon.\n\n`;
 
   assignments.forEach((item) => {
-    if (!item.assignment) return; // Skip if the assignment object is missing
+    if (!item.assignment) return;
 
     const courseName = COURSE_MAP[item.course_id] || "Unknown Course";
     const assignmentName = item.assignment.name || "Unnamed Assignment";
@@ -76,15 +91,18 @@ function formatAssignmentsMessage(assignments) {
       ? new Date(item.assignment.due_at).toLocaleString()
       : "No Due Date";
 
-    message += `📌 ${assignmentName} - ${dueDate} - ${courseName}\n`;
+    message += `📌 ${assignmentName} - ${dueDate} ` + `- ${courseName}\n`;
   });
 
   message += "\nGood Luck and Don't Procrastinate! 🚀";
-
   return message;
 }
 
-// Send SMS notification
+/**
+ * Sends an SMS notification using Twilio.
+ * @param {string} message - The message to be sent.
+ * @return {Promise<void>}
+ */
 async function sendSms(message) {
   try {
     await client.messages.create({
@@ -92,30 +110,23 @@ async function sendSms(message) {
       from: TWILIO_PHONE,
       to: USER_PHONE,
     });
-    //console.log("✅ SMS sent successfully!");
+    console.log("✅ SMS sent successfully!");
   } catch (error) {
-    //console.error("Error sending SMS:", error);
+    console.error("Error sending SMS:", error);
   }
 }
 
-// Run the test
-getAllTodoItems(CANVAS_API_URL).then((todoItems) => {
-  // Filter out assignments without a due date
+// Firebase Cloud Function triggered by Pub/Sub
+(async () => {
+  const todoItems = await getAllTodoItems(CANVAS_API_URL);
   const assignmentsWithDueDates = todoItems.filter(
-    (item) => item.assignment?.due_at
+    (item) => item.assignment && item.assignment.due_at
   );
 
-  // Sort assignments by due date (earliest first)
-  assignmentsWithDueDates.sort(
-    (a, b) => new Date(a.assignment.due_at) - new Date(b.assignment.due_at)
-  );
-
-  //console.log(
-  //  `📌 Retrieved ${assignmentsWithDueDates.length} assignments:`,
-  //  assignmentsWithDueDates
-  //);
+  assignmentsWithDueDates.sort((a, b) => {
+    return new Date(a.assignment.due_at) - new Date(b.assignment.due_at);
+  });
 
   const message = formatAssignmentsMessage(assignmentsWithDueDates);
-  //console.log("📨 Sending SMS with message:\n", message);
-  sendSms(message);
-});
+  await sendSms(message);
+})(); // <-- Add this to execute the function
