@@ -3,6 +3,7 @@ const {onSchedule} = require("firebase-functions/v2/scheduler");
 require("dotenv").config();
 const axios = require("axios");
 const twilio = require("twilio");
+const {DateTime} = require("luxon");
 
 // Canvas Setup
 const CANVAS_API_URL = "https://canvas.iastate.edu/api/v1/users/self/todo";
@@ -89,8 +90,11 @@ function formatAssignmentsMessage(assignments) {
 
     const courseName = COURSE_MAP[item.course_id] || "Unknown Course";
     const assignmentName = item.assignment.name || "Unnamed Assignment";
+
     const dueDate = item.assignment.due_at ?
-      new Date(item.assignment.due_at).toLocaleString() :
+      DateTime.fromISO(item.assignment.due_at, {zone: "utc"})
+          .setZone("America/Chicago")
+          .toFormat("MM/dd/yyyy hh:mm a") :
       "No Due Date";
 
     message += `📌 ${assignmentName} - ${dueDate} ` + `- ${courseName}\n`;
