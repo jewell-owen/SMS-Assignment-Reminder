@@ -94,10 +94,10 @@ function formatAssignmentsMessage(assignments) {
     const dueDate = item.assignment.due_at ?
       DateTime.fromISO(item.assignment.due_at, {zone: "utc"})
           .setZone("America/Chicago")
-          .toFormat("MM/dd/yyyy hh:mm a") :
+          .toFormat("EEEE, MM/dd/yyyy hh:mm a") :
       "No Due Date";
 
-    message += `📌 ${assignmentName} - ${dueDate} ` + `- ${courseName}\n`;
+    message += `📌 ${assignmentName} - ${dueDate} - ${courseName}\n`;
   });
 
   message += "\nGood Luck and Don't Procrastinate! 🚀";
